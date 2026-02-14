@@ -5,21 +5,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. 拉取代码 (升级到 v4)
+      # 1. 拉取代码 (使用 v4)
       - uses: actions/checkout@v4
 
-      # 2. 核心打包步骤 (使用 Buildozer)
+      # 2. 核心打包步骤 (换成了 HeaTTheatR 的修复版)
       - name: Build with Buildozer
-        uses: ArtemSBulgakov/buildozer-action@v1
+        uses: HeaTTheatR/buildozer-action@v1
         id: buildozer
         with:
           command: buildozer android debug
-          buildozer_version: master
+          buildozer_version: stable
+          python_version: 3.10 # 强制指定 Python 版本，防止兼容性问题
 
-      # 3. 上传 APK (升级到 v4 !!! 关键修改)
+      # 3. 上传 APK (使用 v4)
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: package
           path: bin/*.apk
-          compression-level: 0 # 不压缩，直接传
+          compression-level: 0
