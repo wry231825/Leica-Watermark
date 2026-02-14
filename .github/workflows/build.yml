@@ -5,16 +5,21 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      # 1. 拉取代码 (升级到 v4)
+      - uses: actions/checkout@v4
 
+      # 2. 核心打包步骤 (使用 Buildozer)
       - name: Build with Buildozer
         uses: ArtemSBulgakov/buildozer-action@v1
+        id: buildozer
         with:
           command: buildozer android debug
           buildozer_version: master
 
+      # 3. 上传 APK (升级到 v4 !!! 关键修改)
       - name: Upload APK
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: package
           path: bin/*.apk
+          compression-level: 0 # 不压缩，直接传
