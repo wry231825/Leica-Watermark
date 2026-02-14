@@ -3,25 +3,25 @@ on: [push]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04 # 关键修改！强制使用 22.04，避免 24.04 的缺包问题
+
     steps:
-      # 1. 拉取代码
       - uses: actions/checkout@v4
 
-      # 2. 设置 Python 环境 (3.10 是最稳定的版本)
+      # 设置 Python
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 3. 设置 Java 环境 (Android 编译需要)
+      # 设置 Java
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      # 4. 安装系统依赖 (这是最关键的一步，手动安装 Buildozer 需要的库)
+      # 安装依赖 (在 Ubuntu 22.04 下这些包都是存在的)
       - name: Install System Dependencies
         run: |
           sudo apt-get update
@@ -46,19 +46,18 @@ jobs:
             libsqlite3-dev \
             openjdk-17-jdk
 
-      # 5. 安装 Buildozer 和 Cython
+      # 安装 Buildozer
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install buildozer cython==0.29.36
 
-      # 6. 开始打包 (自动下载 SDK/NDK 并编译)
-      # 使用 'yes |' 是为了自动同意 Android SDK 的协议
+      # 开始打包
       - name: Build with Buildozer
         run: |
           yes | buildozer android debug
 
-      # 7. 上传 APK
+      # 上传
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
