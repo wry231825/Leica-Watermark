@@ -5,19 +5,60 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      # 1. 拉取代码 (使用 v4)
+      # 1. 拉取代码
       - uses: actions/checkout@v4
 
-      # 2. 核心打包步骤 (换成了 HeaTTheatR 的修复版)
-      - name: Build with Buildozer
-        uses: HeaTTheatR/buildozer-action@v1
-        id: buildozer
+      # 2. 设置 Python 环境 (3.10 是最稳定的版本)
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          command: buildozer android debug
-          buildozer_version: stable
-          python_version: 3.10 # 强制指定 Python 版本，防止兼容性问题
+          python-version: '3.10'
 
-      # 3. 上传 APK (使用 v4)
+      # 3. 设置 Java 环境 (Android 编译需要)
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 4. 安装系统依赖 (这是最关键的一步，手动安装 Buildozer 需要的库)
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libltdl-dev \
+            libffi-dev \
+            libssl-dev \
+            python3-dev \
+            git \
+            zip \
+            unzip \
+            autoconf \
+            libtool \
+            pkg-config \
+            zlib1g-dev \
+            libncurses5-dev \
+            libncursesw5-dev \
+            libtinfo5 \
+            cmake \
+            libreadline-dev \
+            libsqlite3-dev \
+            openjdk-17-jdk
+
+      # 5. 安装 Buildozer 和 Cython
+      - name: Install Buildozer
+        run: |
+          pip install --upgrade pip
+          pip install buildozer cython==0.29.36
+
+      # 6. 开始打包 (自动下载 SDK/NDK 并编译)
+      # 使用 'yes |' 是为了自动同意 Android SDK 的协议
+      - name: Build with Buildozer
+        run: |
+          yes | buildozer android debug
+
+      # 7. 上传 APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
