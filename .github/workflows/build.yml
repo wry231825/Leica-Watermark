@@ -16,6 +16,13 @@ jobs:
 
       - name: Auto-Generate Android Project Structure
         run: |
+          # ========================================================
+          # 终极修复：趁着当前目录是空的，先把 8.4 版本的核心引擎生米煮成熟饭！
+          # 因为没有 build.gradle 文件，Gradle 9.3.1 就找不到崩溃的理由。
+          # ========================================================
+          gradle wrapper --gradle-version 8.4
+          
+          # 接下来再正常创建文件夹和配置文件
           mkdir -p app/src/main/java/com/app/leica
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/font
@@ -69,14 +76,14 @@ jobs:
           </manifest>
           EOF
           
+          # 移动素材文件
           mv MainActivity.kt app/src/main/java/com/app/leica/MainActivity.kt
           mv logo.png app/src/main/res/drawable/logo.png
           mv font.ttf app/src/main/res/font/font.ttf
 
       - name: Build APK with Gradle
         run: |
-          # 关键修复：强制生成并使用 Gradle 8.4 版本的打包环境
-          gradle wrapper --gradle-version 8.4
+          # 此时 ./gradlew 已经是我们上面第一步偷偷建好的 8.4 版本了！
           ./gradlew assembleDebug --no-daemon
 
       - name: Upload Finished APK
