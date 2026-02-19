@@ -16,7 +16,6 @@ jobs:
 
       - name: Auto-Generate Android Project Structure
         run: |
-          # 骗术生效，生成 8.4 引擎
           echo "" > settings.gradle
           gradle wrapper --gradle-version 8.4
           
@@ -25,8 +24,13 @@ jobs:
           mkdir -p app/src/main/res/font
           
           # ==========================================
-          # 修复点：添加 allprojects，告诉系统去哪里下载代码包
+          # 最终修复：开启 AndroidX 通行证
           # ==========================================
+          cat << 'EOF' > gradle.properties
+          android.useAndroidX=true
+          android.enableJetifier=true
+          EOF
+          
           cat << 'EOF' > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
