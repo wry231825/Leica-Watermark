@@ -145,7 +145,7 @@ fun readExifInfo(context: Context, uri: Uri, onResult: (String, String) -> Unit)
             } else "28mm"
 
             val fNum = exif.getAttribute(ExifInterface.TAG_F_NUMBER) ?: "1.7"
-            val iso = exif.getAttribute(ExifInterface.TAG_ISOSPEED_RATINGS) ?: "100"
+            val iso = exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) ?: "100"
             
             val exposureStr = exif.getAttribute(ExifInterface.TAG_EXPOSURE_TIME)
             val exposure = exposureStr?.let {
