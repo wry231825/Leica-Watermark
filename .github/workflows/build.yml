@@ -16,18 +16,17 @@ jobs:
 
       - name: Auto-Generate Android Project Structure
         run: |
-          # ========================================================
-          # 终极骗术：先给它一个空的 settings.gradle 文件。
-          # 这样它既不会报错说“这不是项目”，也不会因为读取插件而崩溃！
-          # ========================================================
+          # 骗术生效，生成 8.4 引擎
           echo "" > settings.gradle
           gradle wrapper --gradle-version 8.4
           
-          # 引擎准备好了！现在开始生成真正的项目结构和配置文件
           mkdir -p app/src/main/java/com/app/leica
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/font
           
+          # ==========================================
+          # 修复点：添加 allprojects，告诉系统去哪里下载代码包
+          # ==========================================
           cat << 'EOF' > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
@@ -36,9 +35,14 @@ jobs:
                   classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.20" 
               }
           }
+          allprojects {
+              repositories {
+                  google()
+                  mavenCentral()
+              }
+          }
           EOF
           
-          # 覆盖刚才那个骗它用的空 settings.gradle
           cat << 'EOF' > settings.gradle
           rootProject.name = "LeicaMaker"
           include ':app'
@@ -85,7 +89,6 @@ jobs:
 
       - name: Build APK with Gradle
         run: |
-          # 此时 ./gradlew 已经是刚刚用空文件骗出来的纯正 8.4 版本了！
           ./gradlew assembleDebug --no-daemon
 
       - name: Upload Finished APK
