@@ -23,9 +23,6 @@ jobs:
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/font
           
-          # ==========================================
-          # 最终修复：开启 AndroidX 通行证
-          # ==========================================
           cat << 'EOF' > gradle.properties
           android.useAndroidX=true
           android.enableJetifier=true
@@ -52,6 +49,9 @@ jobs:
           include ':app'
           EOF
           
+          # ==========================================
+          # 关键修复：强制统一 Java 和 Kotlin 的编译版本为 17
+          # ==========================================
           cat << 'EOF' > app/build.gradle
           plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
           android {
@@ -60,6 +60,14 @@ jobs:
               defaultConfig { applicationId "com.app.leica"; minSdk 24; targetSdk 34; versionCode 1; versionName "1.0" }
               buildFeatures { compose true }
               composeOptions { kotlinCompilerExtensionVersion '1.5.4' }
+              
+              compileOptions {
+                  sourceCompatibility JavaVersion.VERSION_17
+                  targetCompatibility JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = '17'
+              }
           }
           dependencies {
               implementation 'androidx.core:core-ktx:1.12.0'
@@ -86,7 +94,6 @@ jobs:
           </manifest>
           EOF
           
-          # 移动素材文件
           mv MainActivity.kt app/src/main/java/com/app/leica/MainActivity.kt
           mv logo.png app/src/main/res/drawable/logo.png
           mv font.ttf app/src/main/res/font/font.ttf
