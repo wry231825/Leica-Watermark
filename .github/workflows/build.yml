@@ -16,12 +16,10 @@ jobs:
 
       - name: Auto-Generate Android Project Structure
         run: |
-          # 1. 创建 Android 必须的文件夹
           mkdir -p app/src/main/java/com/app/leica
           mkdir -p app/src/main/res/drawable
           mkdir -p app/src/main/res/font
           
-          # 2. 生成根目录 build.gradle
           cat << 'EOF' > build.gradle
           buildscript {
               repositories { google(); mavenCentral() }
@@ -32,13 +30,11 @@ jobs:
           }
           EOF
           
-          # 3. 生成 settings.gradle
           cat << 'EOF' > settings.gradle
           rootProject.name = "LeicaMaker"
           include ':app'
           EOF
           
-          # 4. 生成 app 目录 build.gradle
           cat << 'EOF' > app/build.gradle
           plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
           android {
@@ -60,7 +56,6 @@ jobs:
           }
           EOF
           
-          # 5. 生成 AndroidManifest.xml
           cat << 'EOF' > app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application android:allowBackup="true" android:label="Leica Maker" android:theme="@android:style/Theme.DeviceDefault.Light.NoActionBar">
@@ -74,13 +69,15 @@ jobs:
           </manifest>
           EOF
           
-          # 6. 将你上传的 3 个文件移动到原生 Android 对应的文件夹里
           mv MainActivity.kt app/src/main/java/com/app/leica/MainActivity.kt
           mv logo.png app/src/main/res/drawable/logo.png
           mv font.ttf app/src/main/res/font/font.ttf
 
       - name: Build APK with Gradle
-        run: gradle assembleDebug --no-daemon
+        run: |
+          # 关键修复：强制生成并使用 Gradle 8.4 版本的打包环境
+          gradle wrapper --gradle-version 8.4
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload Finished APK
         uses: actions/upload-artifact@v4
