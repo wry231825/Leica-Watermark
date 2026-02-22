@@ -8,6 +8,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -19,11 +20,12 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -34,8 +36,8 @@ import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.InputStream
-import kotlin.math.max
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -56,8 +58,10 @@ fun WatermarkScreen() {
     val scope = rememberCoroutineScope()
     
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
-    var deviceName by remember { mutableStateOf("Leica Q2") }
-    var photoParams by remember { mutableStateOf("28mm f/1.7 1/1000 ISO100") }
+    var deviceName by remember { mutableStateOf("LEICA Q (Typ 116)") }
+    var lensModel by remember { mutableStateOf("") }
+    var photoParams by remember { mutableStateOf("28mm   F 1.7   S 1/1000   ISO 250") }
+    var photoDate by remember { mutableStateOf("Feb 23, 2025 at 17:50") }
     var userRotationAngle by remember { mutableIntStateOf(0) }
     var statusMessage by remember { mutableStateOf("Ready. Please select a photo.") }
     var isProcessing by remember { mutableStateOf(false) }
@@ -67,23 +71,28 @@ fun WatermarkScreen() {
     ) { uri ->
         if (uri != null) {
             selectedImageUri = uri
-            userRotationAngle = 0 // Reset rotation on new photo
-            statusMessage = "Photo selected. Check EXIF."
-            readExifInfo(context, uri) { d, p ->
-                deviceName = d
-                photoParams = p
+            userRotationAngle = 0
+            statusMessage = "Photo selected. Extracting EXIF..."
+            readExifInfo(context, uri) { model, lens, params, date ->
+                deviceName = model
+                lensModel = lens
+                photoParams = params
+                photoDate = date
+                statusMessage = "EXIF loaded. You can edit the text below."
             }
         }
     }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Preview Area
         Box(
-            modifier = Modifier.weight(1f).fillMaxWidth().padding(bottom = 10.dp),
+            modifier = Modifier.fillMaxWidth().height(250.dp).padding(bottom = 5.dp),
             contentAlignment = Alignment.Center
         ) {
             if (selectedImageUri != null) {
@@ -98,13 +107,13 @@ fun WatermarkScreen() {
             }
         }
 
-        // Exif Edit Area
-        OutlinedTextField(value = deviceName, onValueChange = { deviceName = it }, label = { Text("Camera Model") }, modifier = Modifier.fillMaxWidth())
-        OutlinedTextField(value = photoParams, onValueChange = { photoParams = it }, label = { Text("Parameters") }, modifier = Modifier.fillMaxWidth())
+        OutlinedTextField(value = deviceName, onValueChange = { deviceName = it }, label = { Text("Camera Model") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = lensModel, onValueChange = { lensModel = it }, label = { Text("Lens Model (Optional)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = photoParams, onValueChange = { photoParams = it }, label = { Text("Parameters") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        OutlinedTextField(value = photoDate, onValueChange = { photoDate = it }, label = { Text("Date & Time") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
         
-        Text(text = statusMessage, color = MaterialTheme.colorScheme.primary)
+        Text(text = statusMessage, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(vertical = 4.dp))
 
-        // Buttons
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Button(onClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) { 
                 Text("Select") 
@@ -118,9 +127,9 @@ fun WatermarkScreen() {
                 onClick = {
                     if (selectedImageUri != null && !isProcessing) {
                         isProcessing = true
-                        statusMessage = "Processing..."
+                        statusMessage = "Generating..."
                         scope.launch {
-                            val success = processAndSaveImage(context, selectedImageUri!!, deviceName, photoParams, userRotationAngle)
+                            val success = processAndSaveImage(context, selectedImageUri!!, deviceName, lensModel, photoParams, photoDate, userRotationAngle)
                             statusMessage = if (success) "Saved successfully to Gallery!" else "Error processing image."
                             isProcessing = false
                         }
@@ -132,20 +141,22 @@ fun WatermarkScreen() {
     }
 }
 
-fun readExifInfo(context: Context, uri: Uri, onResult: (String, String) -> Unit) {
+fun readExifInfo(context: Context, uri: Uri, onResult: (String, String, String, String) -> Unit) {
     try {
         context.contentResolver.openInputStream(uri)?.use { stream ->
             val exif = ExifInterface(stream)
-            val model = exif.getAttribute(ExifInterface.TAG_MODEL) ?: "Leica Q2"
+            var model = exif.getAttribute(ExifInterface.TAG_MODEL) ?: "LEICA Q (Typ 116)"
+            model = model.uppercase(Locale.ROOT)
             
-            // Format Focal Length
+            val lens = exif.getAttribute(ExifInterface.TAG_LENS_MODEL) ?: ""
+
             val focalParts = exif.getAttribute(ExifInterface.TAG_FOCAL_LENGTH)?.split("/")
             val focal = if (focalParts != null && focalParts.size == 2) {
-                (focalParts[0].toDouble() / focalParts[1].toDouble()).toInt().toString() + "mm"
-            } else "28mm"
+                (focalParts[0].toDouble() / focalParts[1].toDouble()).toInt().toString()
+            } else "28"
 
             val fNum = exif.getAttribute(ExifInterface.TAG_F_NUMBER) ?: "1.7"
-            val iso = exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) ?: "100"
+            val iso = exif.getAttribute(ExifInterface.TAG_PHOTOGRAPHIC_SENSITIVITY) ?: "250"
             
             val exposureStr = exif.getAttribute(ExifInterface.TAG_EXPOSURE_TIME)
             val exposure = exposureStr?.let {
@@ -153,20 +164,37 @@ fun readExifInfo(context: Context, uri: Uri, onResult: (String, String) -> Unit)
                 if (d != null && d < 1) "1/${(1/d).toInt()}" else it
             } ?: "1/1000"
             
-            val params = "$focal f/$fNum $exposure ISO$iso"
-            onResult(model, params)
+            val params = "${focal}mm   F $fNum   S $exposure   ISO $iso"
+            
+            val rawDate = exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL)
+            var formattedDate = "Feb 23, 2025 at 17:50"
+            
+            if (!rawDate.isNullOrEmpty()) {
+                try {
+                    val parser = SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.US)
+                    val formatter = SimpleDateFormat("MMM d, yyyy 'at' HH:mm", Locale.US)
+                    val dateObj = parser.parse(rawDate)
+                    if (dateObj != null) {
+                        formattedDate = formatter.format(dateObj)
+                    }
+                } catch (e: Exception) {
+                }
+            }
+            
+            onResult(model, lens, params, formattedDate)
         }
     } catch (e: Exception) {
-        onResult("Leica Q2", "28mm f/1.7 1/1000 ISO100")
+        onResult("LEICA Q (Typ 116)", "", "28mm   F 1.7   S 1/1000   ISO 250", "Feb 23, 2025 at 17:50")
     }
 }
 
-suspend fun processAndSaveImage(context: Context, uri: Uri, deviceText: String, paramText: String, userRotation: Int): Boolean = withContext(Dispatchers.IO) {
+suspend fun processAndSaveImage(
+    context: Context, uri: Uri, deviceText: String, lensText: String, paramText: String, dateText: String, userRotation: Int
+): Boolean = withContext(Dispatchers.IO) {
     try {
         val inputStream = context.contentResolver.openInputStream(uri) ?: return@withContext false
         val originalBitmap = BitmapFactory.decodeStream(inputStream) ?: return@withContext false
         
-        // 1. Handle Rotation (Exif + User input)
         var exifRotation = 0
         context.contentResolver.openInputStream(uri)?.use { stream ->
             val exif = ExifInterface(stream)
@@ -187,27 +215,24 @@ suspend fun processAndSaveImage(context: Context, uri: Uri, deviceText: String, 
         val width = rotatedBitmap.width
         val height = rotatedBitmap.height
 
-        // 2. Calculate Proportions
-        val borderHeight = (width * 0.12f).toInt()
+        val borderHeight = (width * 0.125f).toInt()
         val newHeight = height + borderHeight
-        val padding = width * 0.04f
+        val padding = width * 0.035f 
 
         val resultBitmap = Bitmap.createBitmap(width, newHeight, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(resultBitmap)
         canvas.drawColor(Color.WHITE)
         canvas.drawBitmap(rotatedBitmap, 0f, 0f, null)
 
-        // 3. Prepare Custom Font (Only used for Watermark)
-        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.BLACK
-            try {
-                typeface = ResourcesCompat.getFont(context, R.font.font)
-            } catch (e: Exception) {
-                // Fallback handled silently
-            }
-        }
+        // =========================================
+        // 核心修改：分别加载 Light 和 Regular 字体
+        // =========================================
+        val typeLight = try { ResourcesCompat.getFont(context, R.font.font_light) } catch (e: Exception) { Typeface.DEFAULT }
+        val typeRegular = try { ResourcesCompat.getFont(context, R.font.font_regular) } catch (e: Exception) { Typeface.DEFAULT_BOLD }
 
-        // 4. Draw Logo
+        val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+        textPaint.isFakeBoldText = false // 关闭之前的假粗体，使用真字体
+
         val logoSize = (borderHeight * 0.55f).toInt()
         val logoX = padding
         val logoY = height + (borderHeight - logoSize) / 2f
@@ -217,21 +242,51 @@ suspend fun processAndSaveImage(context: Context, uri: Uri, deviceText: String, 
             it.draw(canvas)
         }
 
-        // 5. Draw Model Text
-        val textX = logoX + logoSize + (padding * 0.5f)
-        val contentCenterY = height + borderHeight / 2f
-        textPaint.textSize = borderHeight * 0.22f
+        val leftTextX = logoX + logoSize + (padding * 0.6f)
         textPaint.textAlign = Paint.Align.LEFT
-        canvas.drawText(deviceText, textX, contentCenterY + (textPaint.textSize / 3), textPaint)
+        
+        // 1.1 "CAPTURED WITH" (使用 Regular，小字)
+        textPaint.typeface = typeRegular
+        textPaint.color = Color.parseColor("#999999")
+        textPaint.textSize = borderHeight * 0.12f
+        val capturedY = height + borderHeight * 0.4f
+        canvas.drawText("CAPTURED WITH", leftTextX, capturedY, textPaint)
 
-        // 6. Draw Parameter Text
+        // 1.2 相机型号 (使用 Regular，大字)
+        textPaint.typeface = typeRegular
+        textPaint.color = Color.parseColor("#111111")
+        textPaint.textSize = borderHeight * 0.22f
+        val modelY = height + borderHeight * 0.68f
+        canvas.drawText(deviceText, leftTextX, modelY, textPaint)
+
+        val rightTextX = width - padding
         textPaint.textAlign = Paint.Align.RIGHT
-        textPaint.color = Color.DKGRAY
-        textPaint.textSize = borderHeight * 0.18f
-        canvas.drawText(paramText, width - padding, contentCenterY + (textPaint.textSize / 3), textPaint)
+        val hasLens = lensText.isNotBlank()
+        
+        // 2.1 拍摄参数 (使用 Regular，黑色)
+        textPaint.typeface = typeRegular
+        textPaint.color = Color.parseColor("#222222")
+        textPaint.textSize = borderHeight * 0.17f
+        val paramsY = if (hasLens) height + borderHeight * 0.35f else height + borderHeight * 0.42f
+        canvas.drawText(paramText, rightTextX, paramsY, textPaint)
 
-        // Save
-        val filename = "LeicaMaker_${System.currentTimeMillis()}.jpg"
+        // 2.2 镜头型号 (使用 Light，灰色)
+        if (hasLens) {
+            textPaint.typeface = typeLight // 切换到细字体
+            textPaint.color = Color.parseColor("#888888")
+            textPaint.textSize = borderHeight * 0.15f
+            val lensY = height + borderHeight * 0.58f
+            canvas.drawText(lensText.uppercase(Locale.ROOT), rightTextX, lensY, textPaint)
+        }
+
+        // 2.3 拍摄时间 (使用 Light，灰色)
+        textPaint.typeface = typeLight // 保持细字体
+        textPaint.color = Color.parseColor("#888888")
+        textPaint.textSize = borderHeight * 0.15f
+        val dateY = if (hasLens) height + borderHeight * 0.81f else height + borderHeight * 0.68f
+        canvas.drawText(dateText, rightTextX, dateY, textPaint)
+
+        val filename = "LeicaFOTOS_${System.currentTimeMillis()}.jpg"
         val contentValues = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, filename)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
@@ -244,6 +299,7 @@ suspend fun processAndSaveImage(context: Context, uri: Uri, deviceText: String, 
             resolver.openOutputStream(outUri)?.use { stream ->
                 resultBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)
             }
+            originalBitmap.recycle()
             return@withContext true
         }
         return@withContext false
