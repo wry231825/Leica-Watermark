@@ -96,7 +96,8 @@ jobs:
           
           mv MainActivity.kt app/src/main/java/com/app/leica/MainActivity.kt
           mv logo.png app/src/main/res/drawable/logo.png
-          mv font.ttf app/src/main/res/font/font.ttf
+          mv font_light.otf app/src/main/res/font/font_light.otf
+          mv font_regular.otf app/src/main/res/font/font_regular.otf
 
       - name: Build APK with Gradle
         run: |
